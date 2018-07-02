@@ -1,0 +1,31 @@
+svg{
+  margin-top : 40px;	
+  width: 200px;
+  display: block;
+  margin: 40px auto 0;
+}
+
+circle , polyline{
+  -webkit-animation-name: example; 
+  -webkit-animation-duration: 4s;
+  animation-name:example;
+  animation-duration: 4s;
+  animation-iteration-count: infinite;
+  
+}
+
+@-webkit-keyframes example {
+    0%   {stroke:#229954;}
+    30%  {stroke:#ABEBC6;}
+    50%  {stroke:#229954;}
+    60%  {stroke:#ABEBC6;}
+    100% {stroke:#229954;}
+
+/* Standard syntax */
+@keyframes example {
+    0%   {stroke:#229954;}
+    30%  {stroke:#ABEBC6;}
+    50%  {stroke:#229954;}
+    60%  {stroke:#ABEBC6;}
+    100% {stroke:#229954;}
+}
