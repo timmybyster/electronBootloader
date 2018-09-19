@@ -11,6 +11,9 @@ var index = 0;
 var interval = null;
 var timeout = null;
 var comPort = null;
+var resetLoopInterval = null;
+var resetInterval = null;
+var resetRetries = 0;
 
 
 
@@ -29,10 +32,17 @@ module.exports = {
         var response = 0;
         var comPorts = 0;
         var comIndex = 0;
+        resetRetries = 0;
+
+        clearInterval(resetLoopInterval);
+        clearInterval(resetInterval);
+        resetLoopInterval = null;
+        resetInterval = null;
+        console.log("Clearing Intervals");
 
         uart.close(() => { });
 
-        var interval = setInterval(function () {
+        resetInterval = setInterval(function () {
             uart.getPorts(function (err, ports) {
                 if (err) {
                     console.log(err);
@@ -43,37 +53,68 @@ module.exports = {
             });
         }, 1000);
 
-        var loopInterval = setInterval(function () {
+        resetLoopInterval = setInterval(function () {
             if (comPorts.length > 0) {
                 switch (response) {
                     case 0:
-                        uart.initialise(comPorts[comIndex].comName, function (err, openPort) {
+                        response = 1;
+                        uart.initialise(comPorts[comIndex].comName, function (err, result) {
                             if (err) {
                                 response = 2;
-                                console.log("COM Port not available");
+                                console.log(err);
                             }
                             else {
-                                reset(function (err, success) {
-                                    if (err) {
-                                        uart.close(() => { });
-                                        console.log("Bootloader Not Detected");
-                                        response = 2;
-                                    }
-                                    else {
-                                        comPort = comPorts[comIndex].comName; 
-                                        uart.close(() => {
-                                            uart.start(comPort);
-                                            callback(null, success);
+                                if(result == "packet Detected"){
+                                    console.log("DEVICE CONNECTED");
+                                    uart.write(buildResetPacket(), () => {
+                                        uart.write(buildResetPacket(), () => {
+                                            uart.write(buildResetPacket(), () => {
+                                                    
+                                                setTimeout(() => {
+                                                    reset((err, result) => {
+                                                        if(err){
+                                                            console.log(err);
+                                                            uart.close(() => { });
+                                                            response = 2;
+                                                        }
+                                                        else{
+                                                            uart.close(() => {
+                                                                uart.start(comPorts[comIndex].comName);
+                                                                clearInterval(resetLoopInterval);
+                                                                clearInterval(resetInterval);    
+                                                                callback(null, result);   
+                                                            });                                        
+                                                        }
+
+                                                    });
+                                                }, 20);
+
+                                            });
                                         });
-                                        comIndex = 0;
-                                        comPorts = null;
-                                        clearInterval(loopInterval);
-                                        clearInterval(interval);
-                                    }
-                                });
+                                    });
+
+                                }
+                                else{
+                                    reset((err, result) => {
+                                        if(err){
+                                            console.log("Nothing ON: " + comPorts[comIndex].comName);
+                                            uart.close(() => { });
+                                            response = 2;
+                                        }
+                                        else{
+                                            uart.close(() => {
+                                                uart.start(comPorts[comIndex].comName);
+                                                clearInterval(resetLoopInterval);
+                                                clearInterval(resetInterval);    
+                                                callback(null, result);   
+                                            });                                                    
+                                        }
+
+                                    });
+                                    
+                                }
                             }
                         });
-                        response = 1;
                         break;
 
                     case 1:
@@ -83,14 +124,17 @@ module.exports = {
                         response = 0;
                         comIndex++;
                         if (comIndex == comPorts.length) {
-                            console.log("callback");
-                            callback("Bootloader Not Detected", null);
+                            callback("Searching for Device", null);
                             comIndex = 0;
+                            resetRetries++;
+                            if (resetRetries >= 3) {
+                                callback("No Device Detected", null);
+                            }
                         }
                         break;
                 }
             }
-        }, 100);
+        }, 1);
 	},
 	
 	write : function(callback){
@@ -414,23 +458,15 @@ function buildPacket(command, address, data, crc){
 }
 
 function reset(callback) {
-    uart.write(buildResetPacket(), (err, result) => {
+    uart.write(buildPacket(COMMAND.RESET, null, null, null), (err, result) => {
         if (err) {
-            callback(err, null);
+            console.log(err);
         }
         else {
             console.log(result);
-            uart.write(buildPacket(COMMAND.RESET, null, null, null), (err, result) => {
-                if (err) {
-                    console.log(err);
-                }
-                else {
-                    console.log(result);
-                }
-            });
         }
     });
-    waitForResponse(COMMAND.RESET, 1000, (err, result) => {
+    waitForResponse(COMMAND.RESET, 50, (err, result) => {
         if (err) {
             callback(err, null);
         }

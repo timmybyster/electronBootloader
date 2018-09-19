@@ -1,6 +1,6 @@
 {
   "name": "nms450-bootloader",
-  "version": "0.0.3",
+  "version": "0.0.0",
   "description": "A Bootloader application for the NMS450.",
   "main": "server.js",
   "author": {

@@ -1,5 +1,4 @@
 ﻿var ipc = require('electron').ipcRenderer;
-reset();
 
 ipc.once("commsSuccess", function (event, data) {
     var version = document.getElementById('version');
@@ -8,10 +7,9 @@ ipc.once("commsSuccess", function (event, data) {
 
 });
 
-ipc.once("commsFail", function (event, data) {
+ipc.on("commsFail", function (event, data) {
     var version = document.getElementById('version');
-    console.log(data);
-    version.innerHTML = "Connect Device";
+    version.innerHTML = data;
 });
 
 ipc.once('readSuccess', function (event, response) {
@@ -146,8 +144,15 @@ ipc.once("windowState", function (event, data) {
     }
 });
 
-function reset() {
-    ipc.send('resetAction', 'someData');
+function uploadFunction() {
+    var fileName = document.getElementsByTagName('input')[0].files[0].path;
+    reset(fileName);
+}
+
+function reset(fileName) {
+    var version = document.getElementById('version');
+    version.innerHTML = "";
+    ipc.send('resetAction', fileName);
 }
 
 function read() {

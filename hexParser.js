@@ -10,7 +10,7 @@ var crc = require('./crc');
 
 module.exports = {
 	parse : function(file, callback){
-		
+		console.log(file);
 		var addressSegment = 0;
 		var code = [];
 		var i = 0;

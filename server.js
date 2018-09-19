@@ -6,6 +6,7 @@ const { autoUpdater } = require("electron-updater");
 
 const comms = require('./commsHandler');
 const hexParser = require('./hexParser');
+const flashParser = require('./flashParser');
 
 var winHeight = 600, winWidth = 900;
 var windowState = true;
@@ -29,7 +30,7 @@ function createWindow() {
     //win.setMenu(null);
 
     // Open devtools
-    win.webContents.openDevTools();
+    //npm rwin.webContents.openDevTools();
 
     win.on('closed', () => {
         win = null;
@@ -37,21 +38,21 @@ function createWindow() {
 }
 
 app.on('ready', function () {
-    autoUpdater.checkForUpdates();
+//    autoUpdater.checkForUpdates();
     createWindow();
 });
 
-autoUpdater.on('checking-for-update', () => {
-    console.log("checkingForUpdates");
-});
+//autoUpdater.on('checking-for-update', () => {
+//    console.log("checkingForUpdates");
+//});
 
-autoUpdater.on('update-available', (info) => {
-});
+//autoUpdater.on('update-available', (info) => {
+//});
 
-autoUpdater.on('update-downloaded', (info) => {
-    console.log(info);
-    autoUpdater.quitAndInstall();
-});
+//autoUpdater.on('update-downloaded', (info) => {
+//    console.log(info);
+//    autoUpdater.quitAndInstall();
+//});
 
 // Quit when all windows are closed
 app.on('window-all-closed', () => {
@@ -62,7 +63,10 @@ app.on('window-all-closed', () => {
 
 var ipc = electron.ipcMain;
 
+var hexFileName;
+
 ipc.on('resetAction', function (event, data) {
+    hexFileName = data;
     comms.initialise(function (err, result) {
         if (err) {
             event.sender.send('commsFail', err);
@@ -80,58 +84,48 @@ ipc.on('readAction', function (event, data) {
             event.sender.send('readFail', err);
         }
         else {
+            flashParser.createFlashObject(result, (err, parsedData) => {
+
+            });
             event.sender.send('readSuccess', "");
         }
     });
 });
 
 ipc.on('uploadAction', function (event, data) {
-    var download = require('download-file');
     var fs = require('fs');
 
-    var options = {
-        directory: "./blocks/",
-        filename: "Bootloader.hex"
-    }
-
     var dir = './blocks';
-
+    
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir);
     }
-
-    download("http://178.62.90.91:3001/boot", options, function (err) {
+    
+    hexParser.parse(hexFileName, function (err, result) {
         if (err) {
-            event.sender.send('uploadResponse', 'Failed');
+            event.sender.send('uploadFailed', 'Failed');
         }
         else {
-            console.log("File Downloaded");
-            hexParser.parse("blocks/Bootloader.hex", function (err, result) {
+            comms.info(result, function (err, result) {
                 if (err) {
                     event.sender.send('uploadFailed', 'Failed');
                 }
                 else {
-                    comms.info(result, function (err, result) {
-                        if (err) {
-                            event.sender.send('uploadFailed', 'Failed');
-                        }
-                        else {
-                            if (result.thisCrc == result.deviceCrc && result.thisBlocks == result.deviceBlocks) {
-                                console.log("Latest Version");
-                                comms.boot(function (err, result) {
-                                    if (err) {
-                                        event.sender.send('bootFail', err);
-                                    }
-                                    else {
-                                        event.sender.send('bootSuccess', result);
-                                    }
-                                });
+                    console.log(result);
+                    if (result.thisCrc == result.deviceCrc && result.thisBlocks == result.deviceBlocks) {
+                        console.log("Latest Version");
+                        comms.boot(function (err, result) {
+                            if (err) {
+                                event.sender.send('bootFail', err);
                             }
                             else {
-                                event.sender.send('uploadResponse', "Estimated Upload Time: " + Math.round(result / 2) + " seconds");
+                                event.sender.send('bootSuccess', result);
                             }
-                        }
-                    });
+                        });
+                    }
+                    else {
+                        event.sender.send('uploadResponse', "Estimated Upload Time: " + Math.round(result / 2) + " seconds");
+                    }
                 }
             });
         }

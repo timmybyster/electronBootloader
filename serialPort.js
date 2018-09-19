@@ -23,6 +23,8 @@ const byteLength = serialPort.parsers.ByteLength;
 var port;
 var parser;
 
+var deviceDetect = false;
+
 module.exports = {
 	
     getPorts: function (callback) {
@@ -36,7 +38,8 @@ module.exports = {
     },
 
     close: function(callback){
-        try {
+		
+		try {
             port.close((err, result) => {
                 if (err) {
                     console.log("Port is Not Open");
@@ -52,9 +55,13 @@ module.exports = {
 
     initialise: function (portName, callback) {
         buffer = [];
-        bufferIndex = 0;
+		bufferIndex = 0;
+		deviceDetected = false;
+		var initialTimeout;
         try {
-            port = new serialPort(portName, { baudRate: 38400 }, (err, result) => {
+			
+			console.log("OPENING: " + portName);
+			port = new serialPort(portName, { baudRate: 38400 }, (err, result) => {
                 if (err) {
                     callback(err);
                 }
@@ -67,13 +74,23 @@ module.exports = {
                         bufferIndex++;
                         if (bufferIndex == BUFFER_SIZE) {
                             bufferIndex = 0;
-                        }
-                    });
-                    callback(null, portName);
+						}
+						if((buffer[bufferIndex - 1] == 0x9E) && (buffer[bufferIndex - 2] == 0xEF) && (buffer[bufferIndex - 3] == 0x04) && (buffer[bufferIndex - 4] == 0xAB) && (deviceDetected == false)){
+							deviceDetected = true;
+							clearTimeout(initialTimeout);
+							callback(null, "packet Detected");
+						}
+
+					});
+					initialTimeout = setTimeout(() => {
+						callback(null, "Nothing detected");
+					}, 200);
+
+                    
                 }
             });
         } catch (e) {
-            callback(e.toString(), null);
+            callback("Port Error", null);
         }
     },
 
@@ -91,7 +108,7 @@ module.exports = {
                 bufferIndex = 0;
             }
         });
-    },
+	},
 	
 	checkResponse : function(){
 		var command = 0;
@@ -189,4 +206,20 @@ function circularIndex(index){
 		index -= BUFFER_SIZE;
 	}
 	return index;
+}
+
+function buildResetPacket(){
+    var packet = [];
+    /*55 01 80 02 01 01 B4 54 AA*/ 
+    packet.push(0xAA);
+    packet.push(0x01);
+    packet.push(0x80);
+    packet.push(0x02);
+    packet.push(0x01);
+    packet.push(0x01);
+    packet.push(0xB4);
+    packet.push(0x54);
+    packet.push(0x55);
+
+    return packet;
 }
